@@ -22,15 +22,15 @@ public class MainPage {
     private Socket socket;
     private String page;
     //private volatile int updated;
-    private volatile boolean lock;
+    //private volatile boolean lock;
     
     public MainPage(){
-    	mainFrame = new JFrame("Event Planner");
+    	mainFrame = new JFrame();
     	mainFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     	server = "localhost";
     	port = 8080;
     	//updated = 0;
-    	lock = false;
+    	//lock = false;
     }
     
     static protected String[] getMonthStrings() {
@@ -69,6 +69,7 @@ public class MainPage {
  	    mainFrame.getContentPane().revalidate();
  	    mainFrame.getContentPane().repaint();  
     	mainFrame.setSize(300,100);
+    	mainFrame.setTitle("Event Planner");
     	JPanel panel = new JPanel();
     	JLabel userLabel = new JLabel("Enter username: ");
     	JTextField userText = new JTextField(10);
@@ -232,12 +233,15 @@ public class MainPage {
     }
     
     private synchronized void setupMainPage(){
-       lock = true;
+       //lock = true;
        page = "mainPage";
 	   mainFrame.getContentPane().removeAll();
 	   mainFrame.getContentPane().revalidate();
 	   mainFrame.getContentPane().repaint();    	
     	
+	   JLabel topLabel = new JLabel("Signed in as: " + username);
+	   mainFrame.add(topLabel,BorderLayout.NORTH);
+	   
 	   JPanel container = new JPanel();
 	   container.setLayout(new BoxLayout(container, BoxLayout.Y_AXIS));
 	   //container.add(Box.createVerticalStrut(10));
@@ -261,7 +265,7 @@ public class MainPage {
 		   updated--;
 		   setupMainPage();
 	   }*/
-	   lock = false;
+	   //lock = false;
 	   mainFrame.setVisible(true);
     }
     
@@ -490,11 +494,11 @@ public class MainPage {
         @Override
         public void run() {
             while(true) {
-                try {                	
-                	//Object received = sInput.readObject();
-                	DateEvent incomingEvent = (DateEvent) sInput.readObject();
-                	//if(received instanceof DateEvent) {
-                		//DateEvent incomingEvent = (DateEvent) received;
+                try {
+                	Object received = sInput.readObject();
+                	//DateEvent incomingEvent = (DateEvent) sInput.readObject();
+                	if(received instanceof DateEvent) {
+                		DateEvent incomingEvent = (DateEvent) received;
                 		boolean existingEvent = false;
                 		for(int i = 0; i < events.size(); i++) {
                 			if(incomingEvent.getID().equals(events.get(i).getID())) {
@@ -508,14 +512,19 @@ public class MainPage {
                 			events.add(incomingEvent);
                 		
                 		if(page.equals("mainPage")) {
-	                		JOptionPane.showMessageDialog(mainFrame, "There are " + events.size() + " events for you.");
+                			if(!incomingEvent.creator.equals(username))
+                				JOptionPane.showMessageDialog(mainFrame, "Event updates from the server arrived at " + incomingEvent.getTimestamp());
 	                		//updated++;
-	                		while(lock) {} //wait while lock is in place.
+	                		//while(lock) {} //wait while lock is in place.
 	                		setupMainPage();
                 		}
-                	//} else {
-                		
-                	//}
+                	} else {
+                		String errorMsg = (String) received;
+                		JOptionPane.showMessageDialog(mainFrame, errorMsg);
+                		disconnect();
+                		loginPage();
+                		break;
+                	}
                 }
                 catch(IOException e) {
                 	 JOptionPane.showMessageDialog(mainFrame, "Server has close the connection: " + e);
