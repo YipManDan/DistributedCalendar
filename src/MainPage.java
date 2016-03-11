@@ -21,6 +21,8 @@ public class MainPage {
     private ObjectOutputStream sOutput; //write to socket
     private Socket socket;
     private String page;
+    private InviteMembersFrame imf;
+	private ArrayList<String> newMembers;
     //private volatile int updated;
     //private volatile boolean lock;
     
@@ -28,7 +30,9 @@ public class MainPage {
     	mainFrame = new JFrame();
     	mainFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     	server = "localhost";
-    	port = 8080;
+    	port = 9001;
+    	imf = null;
+    	newMembers = new ArrayList<>();
     	//updated = 0;
     	//lock = false;
     }
@@ -192,6 +196,7 @@ public class MainPage {
 		goingButton.addActionListener(new ActionListener() {
     	   public void actionPerformed(ActionEvent e) {
     		   	event.setMemberFlag(username, 3);
+    		   	event.setLastSender(username);
     		   	//memberText.setText(setMemberText(event));
 	   	        try {
 		            sOutput.writeObject(event);
@@ -205,6 +210,7 @@ public class MainPage {
 		maybeGoingButton.addActionListener(new ActionListener() {
 	    	   public void actionPerformed(ActionEvent e) {
 	    		   	event.setMemberFlag(username, 2);
+	    		   	event.setLastSender(username);
 	    		   	//memberText.setText(setMemberText(event));
 		   	        try {
 			            sOutput.writeObject(event);
@@ -218,6 +224,7 @@ public class MainPage {
 		notGoingButton.addActionListener(new ActionListener() {
 	    	   public void actionPerformed(ActionEvent e) {
 	    		   	event.setMemberFlag(username, 1);
+	    		   	event.setLastSender(username);
 	    		   	//memberText.setText(setMemberText(event));
 		   	        try {
 			            sOutput.writeObject(event);
@@ -279,7 +286,6 @@ public class MainPage {
 	   
 	   Date startDate = new Date();
 	   Date endDate = new Date();
-	   ArrayList<String> newMembers = new ArrayList<>();
 	   newMembers.add(username);
 	   
 	   //String[] months = getMonthStrings();
@@ -332,15 +338,18 @@ public class MainPage {
 	   
 	   JPanel membersPanel = new JPanel();
 	   JButton addMembersButton = new JButton("Invite member");
-	   JTextField addMembersText = new JTextField(20);
+	   //JTextField addMembersText = new JTextField(20);
 	   
+	   membersLabel.setText("  Members: " + username);
+	   
+	   /*
 	   for(int i = 0; i < newMembers.size(); i++) {
 		   if(i > 0)
 			   membersLabel.setText(membersLabel.getText() + ", " + newMembers.get(i));
 		   else
 			   membersLabel.setText(membersLabel.getText() + newMembers.get(i));
-	   }
-	   membersPanel.add(addMembersText);
+	   }*/
+	   //membersPanel.add(addMembersText);
 	   membersPanel.add(addMembersButton);	   
 	   
 	   mainFrame.add(titleLabel,BorderLayout.NORTH);
@@ -356,37 +365,43 @@ public class MainPage {
 	   container.add(timeSpinner);
 	   container.add(endTimeLabel);
 	   container.add(timeSpinner2);	   
-	   container.add(membersScroll);	  
+	   container.add(membersScroll);	
+	   //container.add(addMembersButton);
 	   container.add(membersPanel);	  
 	   mainFrame.add(container);
 	   mainFrame.add(bottomPanel,BorderLayout.SOUTH);
 	   
 	   addMembersButton.addActionListener(new ActionListener() {
     	   public void actionPerformed(ActionEvent e) {
-    		   String newMemberToAdd = addMembersText.getText();
-    		   boolean valid = true;
-    		   for(String existingMembers: newMembers) {
-    			   if(newMemberToAdd.equals(existingMembers)) {
-    				   valid = false;
-        			   JOptionPane.showMessageDialog(container, "Cannot add member. He or she is already invited to the event");
-    			   }
-    		   }
+    		   imf = new InviteMembersFrame(username);
+    		   try {
+		            sOutput.writeObject("MemberRequest");  
+		       } catch(IOException ioe) {
+		        	JOptionPane.showMessageDialog(mainFrame, "Exception requesting from server: " + ioe);
+		       }  	    		   
+    		   imf.okButton.addMouseListener(new java.awt.event.MouseAdapter() {
+   			    	public void mouseClicked(java.awt.event.MouseEvent evt) {
+   			    		System.out.println("Setting invited members.");
+   			    		newMembers = imf.getSelectedUsers();
+   			    		newMembers.add(username);
+   			    		membersLabel.setText("  Members: ");
+	   			  	    for(int i = 0; i < newMembers.size(); i++) {
+	   					   if(i > 0)
+	   						   membersLabel.setText(membersLabel.getText() + ", " + newMembers.get(i));
+	   					   else
+	   						   membersLabel.setText(membersLabel.getText() + newMembers.get(i));
+	   				    }   			   
+	   			  	   
+	   			  	imf.frmMain.dispatchEvent(new WindowEvent(imf.frmMain, WindowEvent.WINDOW_CLOSING));
+   			    	}    			    
+    		   });
     		   
-    		   if(newMemberToAdd.equals(null) || newMemberToAdd.equals("")) {
-    			   valid = false;
-    			   JOptionPane.showMessageDialog(container, "Please type a member name into the add member textfield.");
-    		   }
-    		   
-    		   if(valid) {
-    			   newMembers.add(newMemberToAdd);
-    			   membersLabel.setText("  Members: ");
-    			   for(int i = 0; i < newMembers.size(); i++) {
-    				   if(i > 0)
-    					   membersLabel.setText(membersLabel.getText() + ", " + newMembers.get(i));
-    				   else
-    					   membersLabel.setText(membersLabel.getText() + newMembers.get(i));
-    			   }
-    		   }
+    		   imf.cancelButton.addMouseListener(new java.awt.event.MouseAdapter() {
+      			    public void mouseClicked(java.awt.event.MouseEvent evt) {
+      			    	System.out.println("Canceling invite member action.");
+      			    	imf.frmMain.dispatchEvent(new WindowEvent(imf.frmMain, WindowEvent.WINDOW_CLOSING));
+      			    }    			    
+    		   });  		   
     	   }
 	   });
 	   
@@ -460,22 +475,29 @@ public class MainPage {
     		   endDate.setHours(Integer.parseInt(newEndTime.substring(0, endTimeColon)));
     		   endDate.setMinutes(Integer.parseInt(newEndTime.substring(endTimeColon+1)));    		   
     		   endDate.setSeconds(0);
-    		   System.out.println(newStartTime);
-    		   System.out.println(newEndTime);
-    		   DateEvent newEvent = new DateEvent(startDate,endDate,newEventDescription,newEventName,username);
-    		   for(String membersToAdd : newMembers) {
-    			   if(membersToAdd.equals(username))
-    	    		   newEvent.setMemberFlag(username, 3);
-    			   else
-    				   newEvent.setMemberFlag(membersToAdd, 0);   
-    		   }
-    		   //events.add(newEvent);
-    	        try {
-    	            sOutput.writeObject(newEvent);
-    	    		setupMainPage();  
-    	        } catch(IOException ioe) {
-    	        	JOptionPane.showMessageDialog(mainFrame, "Exception writing to server: " + ioe);
-    	        }  		  
+    		   
+    		   if(newEventName.equals("") || newEventName.equals(null)) {
+    			   JOptionPane.showMessageDialog(mainFrame, "Please enter an event name.");
+    		   } else if(startDate.after(endDate)) {
+    			   JOptionPane.showMessageDialog(mainFrame, "The event's start time must occur before the end time.");    			   
+    		   } else {
+	    		   DateEvent newEvent = new DateEvent(startDate,endDate,newEventDescription,newEventName,username,username);
+	    		   for(String membersToAdd : newMembers) {
+	    			   if(membersToAdd.equals(username))
+	    	    		   newEvent.setMemberFlag(username, 3);
+	    			   else
+	    				   newEvent.setMemberFlag(membersToAdd, 0);   
+	    		   }
+	    		   //events.add(newEvent);
+	    	        try {
+	    	            sOutput.writeObject(newEvent);
+	    	            System.out.println("Creating new event.");
+	    	            System.out.println(newEvent.title + "\n" + newEvent.getMembers().toString());
+	    	    		setupMainPage();  
+	    	        } catch(IOException ioe) {
+	    	        	JOptionPane.showMessageDialog(mainFrame, "Exception writing to server: " + ioe);
+	    	        }  		  
+    		    }
     	   }
 	   });
     }    
@@ -512,18 +534,23 @@ public class MainPage {
                 			events.add(incomingEvent);
                 		
                 		if(page.equals("mainPage")) {
-                			if(!incomingEvent.creator.equals(username))
+                			if(!incomingEvent.getLastSender().equals(username))
                 				JOptionPane.showMessageDialog(mainFrame, "Event updates from the server arrived at " + incomingEvent.getTimestamp());
 	                		//updated++;
 	                		//while(lock) {} //wait while lock is in place.
 	                		setupMainPage();
                 		}
-                	} else {
+                	} else if(received instanceof String){
                 		String errorMsg = (String) received;
                 		JOptionPane.showMessageDialog(mainFrame, errorMsg);
                 		disconnect();
                 		loginPage();
                 		break;
+                	} else if(received instanceof ArrayList<?>) {
+                		ArrayList<String> users = (ArrayList<String>) received;
+                		if(!imf.equals(null)) {
+                			imf.updateList(users);
+                		}
                 	}
                 }
                 catch(IOException e) {
