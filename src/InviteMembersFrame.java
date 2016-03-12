@@ -73,6 +73,7 @@ public class InviteMembersFrame {
         }
     }
     
+    //Sends back all the users who are selected
     public ArrayList<String> getSelectedUsers() {
     	ArrayList<String> resultList = new ArrayList<>();
    		int[] selected = userList.getSelectedIndices();
