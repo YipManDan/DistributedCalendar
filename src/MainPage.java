@@ -20,19 +20,21 @@ public class MainPage {
     private ObjectInputStream sInput; //read from socket
     private ObjectOutputStream sOutput; //write to socket
     private Socket socket;
-    private String page;
-    //private volatile int updated;
-    //private volatile boolean lock;
-    
+    private String page; //the form currently displayed
+    private InviteMembersFrame imf;
+	private ArrayList<String> newMembers; //the list of invited members on an event
+
+    //The constructor
     public MainPage(){
     	mainFrame = new JFrame();
     	mainFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     	server = "localhost";
-    	port = 8080;
-    	//updated = 0;
-    	//lock = false;
+    	port = 9001;
+    	imf = null;
+    	newMembers = new ArrayList<>();
     }
     
+    //Returns the name of each month
     static protected String[] getMonthStrings() {
         String[] months = new java.text.DateFormatSymbols().getMonths();
         int lastIndex = months.length - 1;
@@ -48,6 +50,7 @@ public class MainPage {
         }
     }    
     
+    //displays all the members invited to an event and their invite status
     private String setMemberText(DateEvent event) {
     	String result = "<html>";
     	for(Map.Entry<String, Integer> entry : event.getMembers().entrySet()) { 		    			
@@ -63,6 +66,7 @@ public class MainPage {
     	return result + "</html>";
     }
     
+    //creates the login page
     public void loginPage() {
     	page = "login";
  	    mainFrame.getContentPane().removeAll();
@@ -81,6 +85,7 @@ public class MainPage {
 
  	    mainFrame.setVisible(true); 
  	    
+ 	    //action listener of the login button
  	    loginButton.addActionListener(new ActionListener() {
 	    	   public void actionPerformed(ActionEvent e) {
 	    		   username = userText.getText().trim();
@@ -96,6 +101,7 @@ public class MainPage {
  	    }); 	    
     }
     
+    //creates a socket connection to the server
     private boolean start() {
         try {
             socket = new Socket(server, port);
@@ -132,6 +138,7 @@ public class MainPage {
     	return true;
     }
     
+    //disconnects from the server
     private void disconnect() {
         try { 
         	if(sInput != null) sInput.close();
@@ -146,12 +153,11 @@ public class MainPage {
         } catch(Exception e) {} // not much else I can do
     }
     
+    //creates a panel displaying one event for the username
     private synchronized void eventPanel(int index, JPanel container) {
     	DateEvent event = events.get(index);
-    	JPanel eventContainer = new JPanel();
-    	//JLabel userLabel = new JLabel();
+    	JPanel eventContainer = new JPanel();    	
     	
-    	//eventContainer.setAlignmentX(Component.CENTER_ALIGNMENT);
     	LineBorder eventBorderLine = new LineBorder(Color.BLACK);
     	Border margin = new EmptyBorder(10,10,10,10);    	
     	eventContainer.setBorder(new CompoundBorder(margin,eventBorderLine));
@@ -159,10 +165,6 @@ public class MainPage {
     	eventContainer.setMinimumSize (new Dimension (750, 0));
     	eventContainer.setMaximumSize (new Dimension (750, 500));
     	eventContainer.setOpaque(true);
-    	
-    	//For Debugging purposes only
-    	//JLabel test = new JLabel("  ID: " + event.getID());
-    	//eventContainer.add(test);
     	
     	JLabel title = new JLabel("  Event: " + event.getTitle());
     	JLabel startDate = new JLabel("  Start Time: " + event.getStart().toString());
@@ -188,11 +190,12 @@ public class MainPage {
 		attendingButtons.add(goingButton);
 		attendingButtons.add(maybeGoingButton);
 		attendingButtons.add(notGoingButton);
-	
+		
+		//tells the server that the user is going to the event
 		goingButton.addActionListener(new ActionListener() {
     	   public void actionPerformed(ActionEvent e) {
     		   	event.setMemberFlag(username, 3);
-    		   	//memberText.setText(setMemberText(event));
+    		   	event.setLastSender(username);
 	   	        try {
 		            sOutput.writeObject(event);
 		    		setupMainPage();  
@@ -202,10 +205,11 @@ public class MainPage {
     	   } 
 		});
 
+		//tells the server that the user might go to the event
 		maybeGoingButton.addActionListener(new ActionListener() {
 	    	   public void actionPerformed(ActionEvent e) {
 	    		   	event.setMemberFlag(username, 2);
-	    		   	//memberText.setText(setMemberText(event));
+	    		   	event.setLastSender(username);
 		   	        try {
 			            sOutput.writeObject(event);
 			    		setupMainPage();  
@@ -215,10 +219,11 @@ public class MainPage {
 	    	   } 
 		});
 		
+		//tells the server that the user is not going to the event
 		notGoingButton.addActionListener(new ActionListener() {
 	    	   public void actionPerformed(ActionEvent e) {
 	    		   	event.setMemberFlag(username, 1);
-	    		   	//memberText.setText(setMemberText(event));
+	    		   	event.setLastSender(username);
 		   	        try {
 			            sOutput.writeObject(event);
 			    		setupMainPage();  
@@ -232,8 +237,8 @@ public class MainPage {
     	container.add(eventContainer);
     }
     
+    //creates the form for the main page of the client
     private synchronized void setupMainPage(){
-       //lock = true;
        page = "mainPage";
 	   mainFrame.getContentPane().removeAll();
 	   mainFrame.getContentPane().revalidate();
@@ -244,10 +249,8 @@ public class MainPage {
 	   
 	   JPanel container = new JPanel();
 	   container.setLayout(new BoxLayout(container, BoxLayout.Y_AXIS));
-	   //container.add(Box.createVerticalStrut(10));
 	   for(int i = 0; i < events.size(); i++) {
 		   eventPanel(i, container);
-		   //container.add(Box.createVerticalStrut(10));
 	   }
 
 	   JScrollPane scrPane = new JScrollPane(container);
@@ -261,14 +264,10 @@ public class MainPage {
 	   });
 	   
 	   mainFrame.add(newButton, BorderLayout.PAGE_END); 
-	   /*if(updated > 0) {
-		   updated--;
-		   setupMainPage();
-	   }*/
-	   //lock = false;
 	   mainFrame.setVisible(true);
     }
     
+    //Creates the form for the setting the fields of a new event
     @SuppressWarnings("deprecation")
 	private synchronized void createNewEvent() { 
        page = "newEvent";
@@ -279,12 +278,7 @@ public class MainPage {
 	   
 	   Date startDate = new Date();
 	   Date endDate = new Date();
-	   ArrayList<String> newMembers = new ArrayList<>();
-	   newMembers.add(username);
-	   
-	   //String[] months = getMonthStrings();
-
-	   //mainFrame.setLayout(new BoxLayout(mainFrame));
+	   newMembers.add(username);	   
 	   
 	   JPanel container = new JPanel(new GridLayout(7,2));
 	   JLabel titleLabel = new JLabel("  Create New Event");
@@ -332,17 +326,11 @@ public class MainPage {
 	   
 	   JPanel membersPanel = new JPanel();
 	   JButton addMembersButton = new JButton("Invite member");
-	   JTextField addMembersText = new JTextField(20);
 	   
-	   for(int i = 0; i < newMembers.size(); i++) {
-		   if(i > 0)
-			   membersLabel.setText(membersLabel.getText() + ", " + newMembers.get(i));
-		   else
-			   membersLabel.setText(membersLabel.getText() + newMembers.get(i));
-	   }
-	   membersPanel.add(addMembersText);
+	   membersLabel.setText("  Members: " + username);	   
 	   membersPanel.add(addMembersButton);	   
 	   
+	   //Adds the components to the form
 	   mainFrame.add(titleLabel,BorderLayout.NORTH);
 	   container.add(eventNameLabel);
 	   container.add(eventName);
@@ -356,40 +344,49 @@ public class MainPage {
 	   container.add(timeSpinner);
 	   container.add(endTimeLabel);
 	   container.add(timeSpinner2);	   
-	   container.add(membersScroll);	  
+	   container.add(membersScroll);	
 	   container.add(membersPanel);	  
 	   mainFrame.add(container);
 	   mainFrame.add(bottomPanel,BorderLayout.SOUTH);
 	   
+	   //creates the InviteMembersFrame frame 
 	   addMembersButton.addActionListener(new ActionListener() {
     	   public void actionPerformed(ActionEvent e) {
-    		   String newMemberToAdd = addMembersText.getText();
-    		   boolean valid = true;
-    		   for(String existingMembers: newMembers) {
-    			   if(newMemberToAdd.equals(existingMembers)) {
-    				   valid = false;
-        			   JOptionPane.showMessageDialog(container, "Cannot add member. He or she is already invited to the event");
-    			   }
-    		   }
+    		   imf = new InviteMembersFrame(username);
+    		   try {
+		            sOutput.writeObject("MemberRequest");  
+		       } catch(IOException ioe) {
+		        	JOptionPane.showMessageDialog(mainFrame, "Exception requesting from server: " + ioe);
+		       }  	    
+    		   //adds the selected members to the event
+    		   imf.okButton.addMouseListener(new java.awt.event.MouseAdapter() {
+   			    	public void mouseClicked(java.awt.event.MouseEvent evt) {
+   			    		System.out.println("Setting invited members.");
+   			    		newMembers = imf.getSelectedUsers();
+   			    		newMembers.add(username);
+   			    		membersLabel.setText("  Members: ");
+	   			  	    for(int i = 0; i < newMembers.size(); i++) {
+	   					   if(i > 0)
+	   						   membersLabel.setText(membersLabel.getText() + ", " + newMembers.get(i));
+	   					   else
+	   						   membersLabel.setText(membersLabel.getText() + newMembers.get(i));
+	   				    }   			   
+	   			  	   
+	   			  	imf.frmMain.dispatchEvent(new WindowEvent(imf.frmMain, WindowEvent.WINDOW_CLOSING));
+   			    	}    			    
+    		   });
     		   
-    		   if(newMemberToAdd.equals(null) || newMemberToAdd.equals("")) {
-    			   valid = false;
-    			   JOptionPane.showMessageDialog(container, "Please type a member name into the add member textfield.");
-    		   }
-    		   
-    		   if(valid) {
-    			   newMembers.add(newMemberToAdd);
-    			   membersLabel.setText("  Members: ");
-    			   for(int i = 0; i < newMembers.size(); i++) {
-    				   if(i > 0)
-    					   membersLabel.setText(membersLabel.getText() + ", " + newMembers.get(i));
-    				   else
-    					   membersLabel.setText(membersLabel.getText() + newMembers.get(i));
-    			   }
-    		   }
+    		   //exits the InviteMembersFrame without adding the members
+    		   imf.cancelButton.addMouseListener(new java.awt.event.MouseAdapter() {
+      			    public void mouseClicked(java.awt.event.MouseEvent evt) {
+      			    	System.out.println("Canceling invite member action.");
+      			    	imf.frmMain.dispatchEvent(new WindowEvent(imf.frmMain, WindowEvent.WINDOW_CLOSING));
+      			    }    			    
+    		   });  		   
     	   }
 	   });
 	   
+	   //creates the calendar frame for selecting the start date
 	   startDateButton.addActionListener(new ActionListener() {
     	   public void actionPerformed(ActionEvent e) {
     		   new CalendarFrame();
@@ -414,6 +411,7 @@ public class MainPage {
     	   }
 	   });
 
+	   //creates the calendar frame for selecting the end date
 	   endDateButton.addActionListener(new ActionListener() {
     	   public void actionPerformed(ActionEvent e) {
     		   new CalendarFrame();
@@ -438,12 +436,14 @@ public class MainPage {
     	   }
 	   });
 	   
+	   //exits back to the main page
 	   backButton.addActionListener(new ActionListener() {
     	   public void actionPerformed(ActionEvent e) {
     		   setupMainPage();    		  
     	   }
 	   });
 	   
+	   //takes all the data and creates a new event
 	   createEventButton.addActionListener(new ActionListener() {
     	   public void actionPerformed(ActionEvent e) {
     		   String newEventName = eventName.getText();
@@ -460,22 +460,28 @@ public class MainPage {
     		   endDate.setHours(Integer.parseInt(newEndTime.substring(0, endTimeColon)));
     		   endDate.setMinutes(Integer.parseInt(newEndTime.substring(endTimeColon+1)));    		   
     		   endDate.setSeconds(0);
-    		   System.out.println(newStartTime);
-    		   System.out.println(newEndTime);
-    		   DateEvent newEvent = new DateEvent(startDate,endDate,newEventDescription,newEventName,username);
-    		   for(String membersToAdd : newMembers) {
-    			   if(membersToAdd.equals(username))
-    	    		   newEvent.setMemberFlag(username, 3);
-    			   else
-    				   newEvent.setMemberFlag(membersToAdd, 0);   
-    		   }
-    		   //events.add(newEvent);
-    	        try {
-    	            sOutput.writeObject(newEvent);
-    	    		setupMainPage();  
-    	        } catch(IOException ioe) {
-    	        	JOptionPane.showMessageDialog(mainFrame, "Exception writing to server: " + ioe);
-    	        }  		  
+    		   
+    		   if(newEventName.equals("") || newEventName.equals(null)) {
+    			   JOptionPane.showMessageDialog(mainFrame, "Please enter an event name.");
+    		   } else if(startDate.after(endDate)) {
+    			   JOptionPane.showMessageDialog(mainFrame, "The event's start time must occur before the end time.");    			   
+    		   } else {
+	    		   DateEvent newEvent = new DateEvent(startDate,endDate,newEventDescription,newEventName,username,username);
+	    		   for(String membersToAdd : newMembers) {
+	    			   if(membersToAdd.equals(username))
+	    	    		   newEvent.setMemberFlag(username, 3);
+	    			   else
+	    				   newEvent.setMemberFlag(membersToAdd, 0);   
+	    		   }	    		    
+	    	        try {
+	    	            sOutput.writeObject(newEvent);
+	    	            System.out.println("Creating new event.");
+	    	            System.out.println(newEvent.title + "\n" + newEvent.getMembers().toString());
+	    	    		setupMainPage();  
+	    	        } catch(IOException ioe) {
+	    	        	JOptionPane.showMessageDialog(mainFrame, "Exception writing to server: " + ioe);
+	    	        }  		  
+    		    }
     	   }
 	   });
     }    
@@ -490,13 +496,12 @@ public class MainPage {
      * if we have a GUI or simply System.out.println() it in console mode
      */
     class ListenFromServer extends Thread {
-        //ArrayList<UserId> users = new ArrayList<>();
         @Override
         public void run() {
             while(true) {
                 try {
+                	//handles objects received from the server
                 	Object received = sInput.readObject();
-                	//DateEvent incomingEvent = (DateEvent) sInput.readObject();
                 	if(received instanceof DateEvent) {
                 		DateEvent incomingEvent = (DateEvent) received;
                 		boolean existingEvent = false;
@@ -512,18 +517,21 @@ public class MainPage {
                 			events.add(incomingEvent);
                 		
                 		if(page.equals("mainPage")) {
-                			if(!incomingEvent.creator.equals(username))
+                			if(!incomingEvent.getLastSender().equals(username))
                 				JOptionPane.showMessageDialog(mainFrame, "Event updates from the server arrived at " + incomingEvent.getTimestamp());
-	                		//updated++;
-	                		//while(lock) {} //wait while lock is in place.
 	                		setupMainPage();
                 		}
-                	} else {
+                	} else if(received instanceof String){
                 		String errorMsg = (String) received;
                 		JOptionPane.showMessageDialog(mainFrame, errorMsg);
                 		disconnect();
                 		loginPage();
                 		break;
+                	} else if(received instanceof ArrayList<?>) {
+                		ArrayList<String> users = (ArrayList<String>) received;
+                		if(!imf.equals(null)) {
+                			imf.updateList(users);
+                		}
                 	}
                 }
                 catch(IOException e) {

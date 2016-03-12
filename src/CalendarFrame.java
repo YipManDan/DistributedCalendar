@@ -34,8 +34,7 @@ public class CalendarFrame{
 		frmMain.setSize(330, 375); //Set size to 400x400 pixels
 		pane = frmMain.getContentPane(); //Get content pane
 		pane.setLayout(null); //Apply null layout
-		//frmMain.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE); //Close when X is clicked
-
+		
 		//Create controls
 		lblMonth = new JLabel ("January");
 		lblYear = new JLabel ("Change year:");
@@ -110,19 +109,7 @@ public class CalendarFrame{
 		//Populate table
 		for (int i=realYear-100; i<=realYear+100; i++){
 			cmbYear.addItem(String.valueOf(i));
-		}
-		
-		/*tblCalendar.addMouseListener(new java.awt.event.MouseAdapter() {
-		    @Override
-		    public void mouseClicked(java.awt.event.MouseEvent evt) {
-		        int row = tblCalendar.rowAtPoint(evt.getPoint());
-		        int col = tblCalendar.columnAtPoint(evt.getPoint());
-		        if (row >= 0 && col >= 0) {
-		        	//dateEvents.lookup((Integer) mtblCalendar.getValueAt(row, col),months[currentMonth],currentYear)
-		        	//JOptionPane.showMessageDialog(null, dateEvents.lookup((Integer) mtblCalendar.getValueAt(row, col),months[currentMonth],currentYear));
-		        }
-		    }
-		});		*/
+		}	
 		
 		//Refresh calendar
 		refreshCalendar (realMonth, realYear); //Refresh calendar
